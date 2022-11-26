@@ -5,7 +5,7 @@ const port = 3333;
 const app = express();
 app.use(express.json());
 
-const customers = [];
+let customers = [];
 
 function verifyIfExistsAccountCPF(request, response, next) {
   const { cpf } = request.headers;
@@ -21,8 +21,8 @@ function verifyIfExistsAccountCPF(request, response, next) {
   return next();
 }
 
-function getBalance(statement) {
-  const balance = statement.reduce((acc, operation) => {
+function getBalance(statements) {
+  const balance = statements.reduce((acc, operation) => {
     if (operation.type === 'credit') {
       return acc + operation.amount;
     } else {
@@ -39,11 +39,19 @@ app.get('/accounts', verifyIfExistsAccountCPF, (request, response) => {
   response.json(customer);
 });
 
+app.get('/accounts/balance', verifyIfExistsAccountCPF, (request, response) => {
+  const { customer } = request;
+
+  const balance = getBalance(customer.statements);
+
+  response.json(balance);
+});
+
 /**
  * cpf - string
  * name - string
  * id - uuid
- * statement - []
+ * statements - []
  */
 app.post('/accounts', (request, response) => {
   const { cpf, name } = request.body;
@@ -62,7 +70,7 @@ app.post('/accounts', (request, response) => {
     id,
     cpf,
     name,
-    statement: [],
+    statements: [],
   });
 
   return response.sendStatus(201);
@@ -77,10 +85,18 @@ app.put('/accounts', verifyIfExistsAccountCPF, (request, response) => {
   return response.sendStatus(201);
 });
 
+app.delete('/accounts', verifyIfExistsAccountCPF, (request, response) => {
+  const { customer: loggedCustomer } = request;
+
+  customers = customers.filter((customer) => customer.id !== loggedCustomer.id);
+
+  response.sendStatus(204);
+});
+
 app.get('/statements', verifyIfExistsAccountCPF, (request, response) => {
   const { customer } = request;
 
-  return response.json(customer.statement);
+  return response.json(customer.statements);
 });
 
 app.get('/statements/date', verifyIfExistsAccountCPF, (request, response) => {
@@ -89,12 +105,12 @@ app.get('/statements/date', verifyIfExistsAccountCPF, (request, response) => {
 
   const dateFormat = new Date(date + ' 00:00');
 
-  const statement = customer.statement.filter(
-    (statement) =>
-      statement.created_at.toDateString() === dateFormat.toDateString()
+  const statements = customer.statements.filter(
+    (statements) =>
+      statements.created_at.toDateString() === dateFormat.toDateString()
   );
 
-  return response.json(statement);
+  return response.json(statements);
 });
 
 app.post('/deposits', verifyIfExistsAccountCPF, (request, response) => {
@@ -108,7 +124,7 @@ app.post('/deposits', verifyIfExistsAccountCPF, (request, response) => {
     type: 'credit',
   };
 
-  customer.statement.push(statementOperation);
+  customer.statements.push(statementOperation);
 
   return response.sendStatus(201);
 });
@@ -117,7 +133,7 @@ app.post('/withdraw', verifyIfExistsAccountCPF, (request, response) => {
   const { amount } = request.body;
   const { customer } = request;
 
-  const balance = getBalance(customer.statement);
+  const balance = getBalance(customer.statements);
 
   if (balance < amount) {
     return response.status(400).json({ error: 'Insufficient founds' });
@@ -129,7 +145,7 @@ app.post('/withdraw', verifyIfExistsAccountCPF, (request, response) => {
     type: 'debit',
   };
 
-  customer.statement.push(statementOperation);
+  customer.statements.push(statementOperation);
 
   return response.sendStatus(201);
 });
