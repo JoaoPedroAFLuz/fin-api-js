@@ -33,6 +33,12 @@ function getBalance(statement) {
   return balance;
 }
 
+app.get('/accounts', verifyIfExistsAccountCPF, (request, response) => {
+  const { customer } = request;
+
+  response.json(customer);
+});
+
 /**
  * cpf - string
  * name - string
@@ -58,6 +64,15 @@ app.post('/accounts', (request, response) => {
     name,
     statement: [],
   });
+
+  return response.sendStatus(201);
+});
+
+app.put('/accounts', verifyIfExistsAccountCPF, (request, response) => {
+  const { name } = request.body;
+  const { customer } = request;
+
+  customer.name = name;
 
   return response.sendStatus(201);
 });
